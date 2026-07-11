@@ -5,7 +5,13 @@ from __future__ import annotations
 import pandas as pd
 
 from marketpulseai.features.build import FEATURE_COLUMNS, TARGET_COLUMN
-from marketpulseai.model.train import split_time_series, train_and_evaluate
+from marketpulseai.model.common import split_time_series, train_and_evaluate
+from marketpulseai.model.train_dummy import build_model as build_dummy_model
+from marketpulseai.model.train_hist_gradient_boosting import (
+    build_model as build_hist_gradient_boosting_model,
+)
+from marketpulseai.model.train_logistic import build_model as build_logistic_model
+from marketpulseai.model.train_random_forest import build_model as build_random_forest_model
 
 
 def make_feature_frame(rows: int = 40) -> pd.DataFrame:
@@ -44,12 +50,10 @@ def test_split_time_series_preserves_order() -> None:
     assert validation_frame["timestamp"].max() < test_frame["timestamp"].min()
 
 
-def test_train_and_evaluate_returns_expected_metrics_shape() -> None:
-    model, metrics = train_and_evaluate(make_feature_frame())
-
+def assert_metrics_shape(metrics: dict[str, object], model_type: str) -> None:
     assert list(metrics["feature_columns"]) == FEATURE_COLUMNS
     assert metrics["target_column"] == TARGET_COLUMN
-    assert metrics["model_type"] == "logistic_regression"
+    assert metrics["model_type"] == model_type
     assert metrics["splits"]["train_rows"] > metrics["splits"]["validation_rows"] > 0
     assert metrics["splits"]["test_rows"] > 0
 
@@ -64,4 +68,24 @@ def test_train_and_evaluate_returns_expected_metrics_shape() -> None:
         assert 0.0 <= split_metrics["mean_up_probability"] <= 1.0
         assert set(split_metrics["confusion_matrix"]) == {"tn", "fp", "fn", "tp"}
 
+
+def test_train_and_evaluate_returns_expected_metrics_shape_for_logistic() -> None:
+    model, metrics = train_and_evaluate(
+        make_feature_frame(),
+        build_logistic_model(),
+        "logistic_regression",
+    )
+
+    assert_metrics_shape(metrics, "logistic_regression")
     assert hasattr(model, "predict")
+
+
+def test_train_and_evaluate_returns_expected_metrics_shape_for_other_models() -> None:
+    for model_name, model in [
+        ("dummy_prior", build_dummy_model()),
+        ("random_forest", build_random_forest_model()),
+        ("hist_gradient_boosting", build_hist_gradient_boosting_model()),
+    ]:
+        trained_model, metrics = train_and_evaluate(make_feature_frame(), model, model_name)
+        assert_metrics_shape(metrics, model_name)
+        assert hasattr(trained_model, "predict")

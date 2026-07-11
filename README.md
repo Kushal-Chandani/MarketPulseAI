@@ -85,3 +85,12 @@ The training step uses:
 - held-out validation and test metrics saved to `artifacts/metrics.json`
 
 The trained model artifact is saved to `artifacts/model.joblib`.
+
+Additional model experiment entrypoints are available for comparison:
+
+- `python -m marketpulseai.model.train_dummy`
+- `python -m marketpulseai.model.train_logistic`
+- `python -m marketpulseai.model.train_random_forest`
+- `python -m marketpulseai.model.train_hist_gradient_boosting`
+
+Each writes its own model and metrics files under `artifacts/`.
