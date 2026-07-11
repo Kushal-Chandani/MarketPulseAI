@@ -30,7 +30,7 @@ The codebase currently includes:
 - a `src`-layout Python package
 - a working hourly `XAU/USD` fetch command
 - a working feature engineering command for next-candle classification
-- a placeholder CLI entrypoint for model training
+- a working model training and evaluation command
 - a placeholder FastAPI application
 - test scaffolding and artifact directories
 
@@ -75,3 +75,13 @@ The feature step produces a processed dataset with five predictors and one binar
 - `volatility_6`: six-candle rolling standard deviation of log returns
 - `ema_gap_8`: distance from an 8-period exponential moving average
 - `target_up`: `1` when the next candle closes above the current close, else `0`
+
+## Training And Evaluation
+
+The training step uses:
+
+- a chronological split: 70% train, 15% validation, 15% test
+- a `StandardScaler` + logistic regression pipeline
+- held-out validation and test metrics saved to `artifacts/metrics.json`
+
+The trained model artifact is saved to `artifacts/model.joblib`.
