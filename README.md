@@ -29,6 +29,7 @@ The codebase currently includes:
 
 - a `src`-layout Python package
 - a working hourly `XAU/USD` fetch command
+- a working feature engineering command for next-candle classification
 - a placeholder CLI entrypoint for model training
 - a placeholder FastAPI application
 - test scaffolding and artifact directories
@@ -37,6 +38,7 @@ The codebase currently includes:
 
 ```bash
 python -m marketpulseai.data.fetch
+python -m marketpulseai.features.build
 python -m marketpulseai.model.train
 uvicorn marketpulseai.api.main:app --reload
 ```
@@ -62,3 +64,14 @@ Example `.env`:
 ```env
 TWELVEDATA_API_KEY=your_api_key_here
 ```
+
+## Engineered Features
+
+The feature step produces a processed dataset with five predictors and one binary target:
+
+- `log_return_1`: one-candle log return
+- `momentum_3`: three-candle percentage momentum
+- `range_pct`: intrabar high-low range normalized by close
+- `volatility_6`: six-candle rolling standard deviation of log returns
+- `ema_gap_8`: distance from an 8-period exponential moving average
+- `target_up`: `1` when the next candle closes above the current close, else `0`
