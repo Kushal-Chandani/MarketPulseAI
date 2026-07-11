@@ -13,6 +13,7 @@ dependencies = [
     "joblib",
     "numpy",
     "pandas",
+    "python-dotenv",
     "pytest",
     "requests",
     "scikit-learn",

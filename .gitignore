@@ -222,3 +222,9 @@ artifacts/*
 !artifacts/.gitkeep
 data/*
 !data/.gitkeep
+!data/raw/
+!data/processed/
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep

@@ -23,12 +23,13 @@ This repository will be built in stages:
 
 ## Current Status
 
-Scaffold only.
+Data ingestion is implemented.
 
 The codebase currently includes:
 
 - a `src`-layout Python package
-- placeholder CLI entrypoints for data fetching and model training
+- a working hourly `XAU/USD` fetch command
+- a placeholder CLI entrypoint for model training
 - a placeholder FastAPI application
 - test scaffolding and artifact directories
 
@@ -38,4 +39,26 @@ The codebase currently includes:
 python -m marketpulseai.data.fetch
 python -m marketpulseai.model.train
 uvicorn marketpulseai.api.main:app --reload
+```
+
+These commands work when run from the repository root. The repo includes a small top-level package shim so the `src` layout is importable locally without requiring an editable install first.
+
+## Data Source
+
+The ingestion step uses Twelve Data's time series endpoint with:
+
+- `symbol=XAU/USD`
+- `interval=1h`
+
+You need a free Twelve Data API key in `TWELVEDATA_API_KEY` before running the fetch command.
+
+You can provide it either:
+
+- in your shell environment, or
+- in a local `.env` file at the repo root
+
+Example `.env`:
+
+```env
+TWELVEDATA_API_KEY=your_api_key_here
 ```
