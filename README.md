@@ -1,103 +1,137 @@
 # MarketPulseAI
 
-MarketPulseAI is a starter repository for an hourly `XAUUSD` next-candle direction classification project.
+MarketPulseAI is a machine learning project that predicts whether the next hourly `XAUUSD` candle will close up or down.
 
-## Goal
+In simple terms:
 
-Build a reproducible machine learning pipeline that:
+- `XAUUSD` is the price of gold quoted in US dollars
+- the project looks at recent hourly gold price behavior
+- it creates a few simple signals from that price history
+- it uses those signals to predict the direction of the next hour
+- it exposes the latest prediction through a FastAPI API
 
-- downloads historical hourly `XAUUSD` OHLC data from a free source
-- engineers point-in-time-safe predictive features
-- trains a simple classifier for the next candle's direction
-- serves the latest prediction through a FastAPI endpoint
+This repository is designed as a clean, reviewable take-home style project. The main focus is not flashy model complexity. The focus is disciplined data handling, no look-ahead leakage, honest time-based evaluation, and a usable inference API.
 
-## Scope
+## What This Project Does
 
-This repository will be built in stages:
+If a non-technical person were using this project, the summary would be:
 
-1. Project scaffold
-2. Data ingestion
-3. Feature engineering
-4. Model training and evaluation
-5. FastAPI inference service
+1. Download recent hourly gold price data
+2. Turn that data into a few meaningful indicators
+3. Train models to guess whether the next hour closes higher or lower
+4. Compare the models fairly on future data they have not seen before
+5. Serve the best model through an API so the latest prediction can be requested on demand
 
-## Current Status
+This project predicts **direction**, not exact price.
 
-Inference API is implemented.
+That means the output is:
 
-The codebase currently includes:
+- `up`: the next hourly candle is expected to close above the current close
+- `down`: the next hourly candle is expected to close at or below the current close
 
-- a `src`-layout Python package
-- a working hourly `XAU/USD` fetch command
-- a working feature engineering command for next-candle classification
-- a working model training and evaluation command
-- a FastAPI application serving the current best model
-- test scaffolding and artifact directories
+## Why This Project Exists
 
-## Planned Entry Points
+Financial machine learning projects often look better than they really are because of weak evaluation or data leakage.
 
-```bash
-python -m marketpulseai.data.fetch
-python -m marketpulseai.features.build
-python -m marketpulseai.model.train
-uvicorn marketpulseai.api.main:app --reload
+This project was built to avoid that.
+
+Key rules followed here:
+
+- all features use only information available at the time of prediction
+- the target is the **next** candle's direction, not the current candle
+- the dataset is split by time, not randomly
+- evaluation is reported on a true holdout period
+- weaker baselines are included so model gains are visible and honest
+
+## Project Flow
+
+The full workflow is:
+
+```text
+Raw hourly XAUUSD candles
+    -> feature engineering
+    -> train / validation / test split by time
+    -> multiple classifier experiments
+    -> select the best held-out model
+    -> serve latest prediction with FastAPI
 ```
-
-These commands work when run from the repository root. The repo includes a small top-level package shim so the `src` layout is importable locally without requiring an editable install first.
 
 ## Data Source
 
-The ingestion step uses Twelve Data's time series endpoint with:
+Historical hourly candles are downloaded from Twelve Data.
 
-- `symbol=XAU/USD`
-- `interval=1h`
+- Symbol: `XAU/USD`
+- Interval: `1h`
+- Output used in this project: hourly OHLC candles
 
-You need a free Twelve Data API key in `TWELVEDATA_API_KEY` before running the fetch command.
+You need a Twelve Data API key in a local `.env` file or in your shell environment.
 
-You can provide it either:
-
-- in your shell environment, or
-- in a local `.env` file at the repo root
-
-Example `.env`:
+Example:
 
 ```env
 TWELVEDATA_API_KEY=your_api_key_here
 ```
 
-## Engineered Features
+## Features Used
 
-The feature step produces a processed dataset with five predictors and one binary target:
+The current version uses five hand-engineered features:
 
-- `log_return_1`: one-candle log return
-- `momentum_3`: three-candle percentage momentum
-- `range_pct`: intrabar high-low range normalized by close
-- `volatility_6`: six-candle rolling standard deviation of log returns
-- `ema_gap_8`: distance from an 8-period exponential moving average
-- `target_up`: `1` when the next candle closes above the current close, else `0`
+1. `log_return_1`
+Recent one-candle log return.
 
-## Training And Evaluation
+2. `momentum_3`
+Three-candle momentum, which captures short-term trend.
 
-The training step uses:
+3. `range_pct`
+The candle's high-low range divided by close, which measures how large the move was inside the hour.
 
-- a chronological split: 70% train, 15% validation, 15% test
-- a `StandardScaler` + logistic regression pipeline
-- held-out validation and test metrics saved to `artifacts/metrics.json`
+4. `volatility_6`
+Rolling standard deviation of recent log returns over six candles.
 
-The trained model artifact is saved to `artifacts/model.joblib`.
+5. `ema_gap_8`
+Distance between the current close and an 8-period exponential moving average.
 
-Additional model experiment entrypoints are available for comparison:
+These were chosen because they are simple, interpretable, and reasonable for a baseline directional model.
 
-- `python -m marketpulseai.model.train_dummy`
-- `python -m marketpulseai.model.train_logistic`
-- `python -m marketpulseai.model.train_random_forest`
-- `python -m marketpulseai.model.train_hist_gradient_boosting`
+## Target Definition
 
-Each writes its own model and metrics files under `artifacts/`.
+The target is:
+
+- `1` if `close[t+1] > close[t]`
+- `0` otherwise
+
+So the model never sees the future target when generating the input features for row `t`.
+
+## Train / Validation / Test Split
+
+The data is split chronologically:
+
+- 70% train
+- 15% validation
+- 15% test
+
+This matters because random shuffling would create an unrealistic evaluation for time series data. In real usage, a model only has access to the past, so the test set must come after the training period.
+
+Current split sizes from the generated dataset:
+
+- train: `3495` rows
+- validation: `749` rows
+- test: `750` rows
+
+## Models Tried
+
+The following models were trained and evaluated:
+
+- Dummy prior baseline
+- Logistic regression
+- Random forest
+- Histogram gradient boosting
+
+The dummy baseline is important because it shows what happens if the model simply predicts the majority class. If a more advanced model cannot beat that baseline meaningfully, it is not useful.
+
+## Results
 
 ### Model Comparison
-
-The current best model is `random_forest`, selected because it has the strongest held-out validation and test balanced accuracy among the models tried so far.
 
 | Model | Validation Accuracy | Validation Balanced Acc. | Test Accuracy | Test Balanced Acc. |
 | --- | ---: | ---: | ---: | ---: |
@@ -106,16 +140,180 @@ The current best model is `random_forest`, selected because it has the strongest
 | Random forest | 0.5768 | 0.5745 | 0.5600 | 0.5535 |
 | Hist. gradient boosting | 0.5794 | 0.5777 | 0.5467 | 0.5430 |
 
+### Selected Model
+
+The API currently serves the `random_forest` model.
+
+Why:
+
+- it clearly beats the dummy baseline
+- it outperforms logistic regression on both validation and test
+- it has the strongest held-out test balanced accuracy among the tested models
+- it is a reasonable non-linear model for a small tabular feature set
+
+### Honest Interpretation
+
+The results are better than chance, but not dramatically so.
+
+That is a realistic outcome for short-horizon financial direction prediction. A model with about `0.56` test accuracy and `0.5535` balanced accuracy is not a magic trading system. It is simply the strongest model in this baseline experiment.
+
+This is exactly why the evaluation is useful: it shows modest predictive signal without pretending the model is stronger than it is.
+
 ## API
 
-The API currently serves the `random_forest` artifact by default:
+The FastAPI service serves the latest prediction from the best current model.
 
-- model artifact: `artifacts/model_random_forest.joblib`
-- metrics artifact: `artifacts/metrics_random_forest.json`
-- feature input: `data/processed/xauusd_1h_features.csv`
+Current default artifacts:
+
+- model: `artifacts/model_random_forest.joblib`
+- metrics: `artifacts/metrics_random_forest.json`
+- features input: `data/processed/xauusd_1h_features.csv`
 
 Available endpoints:
 
 - `GET /health`
 - `GET /model/info`
 - `GET /predict/latest`
+
+### Example Response
+
+`GET /predict/latest` returns a payload like:
+
+```json
+{
+  "symbol": "XAUUSD",
+  "timeframe": "1h",
+  "model_type": "random_forest",
+  "as_of_timestamp": "2026-07-12T06:00:00",
+  "predicted_direction": "down",
+  "up_probability": 0.2482,
+  "features": {
+    "log_return_1": -0.000024,
+    "momentum_3": -0.000018,
+    "range_pct": 0.000044,
+    "volatility_6": 0.000011,
+    "ema_gap_8": -0.000010
+  }
+}
+```
+
+## Repository Structure
+
+```text
+src/marketpulseai/data/        data download
+src/marketpulseai/features/    feature engineering
+src/marketpulseai/model/       training and evaluation
+src/marketpulseai/api/         FastAPI inference service
+data/raw/                      downloaded candles
+data/processed/                engineered feature dataset
+artifacts/                     trained models and metrics
+tests/                         automated tests
+```
+
+## How To Run
+
+### 1. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 2. Add your API key
+
+Create a `.env` file in the repo root:
+
+```env
+TWELVEDATA_API_KEY=your_api_key_here
+```
+
+### 3. Download raw data
+
+```bash
+python -m marketpulseai.data.fetch
+```
+
+### 4. Build features
+
+```bash
+python -m marketpulseai.features.build
+```
+
+### 5. Train the default model
+
+```bash
+python -m marketpulseai.model.train
+```
+
+### 6. Train comparison models
+
+```bash
+python -m marketpulseai.model.train_dummy
+python -m marketpulseai.model.train_logistic
+python -m marketpulseai.model.train_random_forest
+python -m marketpulseai.model.train_hist_gradient_boosting
+```
+
+### 7. Run the API
+
+```bash
+uvicorn marketpulseai.api.main:app --reload
+```
+
+### 8. Call the endpoints
+
+```bash
+curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/model/info
+curl http://127.0.0.1:8000/predict/latest
+```
+
+## Testing
+
+Run the test suite with:
+
+```bash
+pytest
+```
+
+The test coverage includes:
+
+- data ingestion parsing and validation
+- feature engineering alignment
+- target construction
+- chronological train/validation/test splitting
+- model training metric structure
+- API helper and endpoint behavior
+
+## Important Limitations
+
+This project is intentionally honest about its limits:
+
+- it uses a small set of handcrafted price-only features
+- it does not include transaction costs, slippage, or trading rules
+- it predicts next-candle direction, not profitability
+- it is trained on one instrument and one timeframe only
+- model performance is modest and should not be overstated
+
+## Future Improvements
+
+Possible next steps:
+
+- richer technical features
+- rolling or walk-forward retraining
+- probability threshold tuning on validation data
+- calibration checks for predicted probabilities
+- a trading simulation layer with costs and execution assumptions
+- feature importance and model monitoring outputs
+
+## Summary
+
+MarketPulseAI is a clean baseline machine learning system for hourly gold direction prediction.
+
+Its value is not that it "solves" the market. Its value is that it demonstrates a disciplined workflow:
+
+- clean data ingestion
+- no look-ahead leakage
+- time-aware evaluation
+- multiple model comparisons
+- transparent reporting
+- simple API-based serving
