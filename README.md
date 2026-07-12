@@ -23,7 +23,7 @@ This repository will be built in stages:
 
 ## Current Status
 
-Data ingestion is implemented.
+Inference API is implemented.
 
 The codebase currently includes:
 
@@ -31,7 +31,7 @@ The codebase currently includes:
 - a working hourly `XAU/USD` fetch command
 - a working feature engineering command for next-candle classification
 - a working model training and evaluation command
-- a placeholder FastAPI application
+- a FastAPI application serving the current best model
 - test scaffolding and artifact directories
 
 ## Planned Entry Points
@@ -94,3 +94,28 @@ Additional model experiment entrypoints are available for comparison:
 - `python -m marketpulseai.model.train_hist_gradient_boosting`
 
 Each writes its own model and metrics files under `artifacts/`.
+
+### Model Comparison
+
+The current best model is `random_forest`, selected because it has the strongest held-out validation and test balanced accuracy among the models tried so far.
+
+| Model | Validation Accuracy | Validation Balanced Acc. | Test Accuracy | Test Balanced Acc. |
+| --- | ---: | ---: | ---: | ---: |
+| Dummy prior | 0.5060 | 0.5000 | 0.5160 | 0.5000 |
+| Logistic regression | 0.5087 | 0.5030 | 0.5133 | 0.4984 |
+| Random forest | 0.5768 | 0.5745 | 0.5600 | 0.5535 |
+| Hist. gradient boosting | 0.5794 | 0.5777 | 0.5467 | 0.5430 |
+
+## API
+
+The API currently serves the `random_forest` artifact by default:
+
+- model artifact: `artifacts/model_random_forest.joblib`
+- metrics artifact: `artifacts/metrics_random_forest.json`
+- feature input: `data/processed/xauusd_1h_features.csv`
+
+Available endpoints:
+
+- `GET /health`
+- `GET /model/info`
+- `GET /predict/latest`
